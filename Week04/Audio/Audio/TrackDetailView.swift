@@ -6,11 +6,12 @@ struct TrackDetailView: View {
     @State private var audioPlayer: AVAudioPlayer?
     @State private var isPlaying = false
     @State private var playbackProgress: Double = 0
+    @State private var audioLength: Double = 1 // Initialize to ensure it's always positive
 
     var body: some View {
         VStack {
-            // Adjusted to load from a folder reference
-            if let img = UIImage(named: "Image/\(trackName)") {
+            // Adjusted for new "Files" folder structure
+            if let img = UIImage(named: "Files/\(trackName)") {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFit()
@@ -20,10 +21,12 @@ struct TrackDetailView: View {
                 Text("Image not found")
             }
 
-            Slider(value: $playbackProgress, in: 0...1, step: 0.01)
+            // Slider to control playback progress
+            Slider(value: $playbackProgress, in: 0...max(audioLength, 1), step: 0.1, onEditingChanged: sliderEditingChanged)
                 .padding()
                 .accentColor(.pink)
 
+            // Play/Pause Button
             Button(action: {
                 self.togglePlayPause()
             }) {
@@ -41,19 +44,20 @@ struct TrackDetailView: View {
     }
 
     private func setupAudioPlayer() {
-        guard let url = Bundle.main.url(forResource: trackName, withExtension: "m4a", subdirectory: "Audio") else {
-            print("Audio file not found for \(trackName). Check if it's added to the project as a bundle resource.")
+        // Adjusted for new "Files" folder structure
+        guard let url = Bundle.main.url(forResource: "Files/\(trackName)", withExtension: "m4a") else {
+            print("Audio file not found for \(trackName).")
             return
         }
 
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.prepareToPlay()
+            audioLength = audioPlayer?.duration ?? 1 // Update to audio duration or keep 1 if not available
         } catch {
             print("Error loading \(trackName).m4a: \(error)")
         }
     }
-
 
     private func togglePlayPause() {
         guard let player = audioPlayer else { return }
@@ -64,7 +68,28 @@ struct TrackDetailView: View {
         } else {
             player.play()
             isPlaying = true
-            // Implement the playback progress tracking logic here
+            startTrackingPlaybackTime()
+        }
+    }
+
+    private func startTrackingPlaybackTime() {
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+            if let player = audioPlayer, player.isPlaying {
+                playbackProgress = player.currentTime
+            } else {
+                timer.invalidate()
+            }
+        }
+    }
+
+    private func sliderEditingChanged(editingStarted: Bool) {
+        if !editingStarted {
+            audioPlayer?.currentTime = playbackProgress
+            if isPlaying {
+                audioPlayer?.play()
+            }
+        } else {
+            audioPlayer?.pause()
         }
     }
 }
