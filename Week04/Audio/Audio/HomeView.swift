@@ -11,6 +11,13 @@ struct HomeView: View {
                         .background(Color.gray)
                         .cornerRadius(10)
                 }
+                NavigationLink(destination: PianoView()) { // Add this link for PianoView
+                    Text("Piano")
+                        .foregroundColor(.pink)
+                        .padding()
+                        .background(Color.gray)
+                        .cornerRadius(10)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black)
