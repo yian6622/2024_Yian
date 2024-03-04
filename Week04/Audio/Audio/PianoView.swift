@@ -1,48 +1,103 @@
 import SwiftUI
+import AVFoundation
 
-struct PianoView: View {
-    // Indices for white keys in two octaves
-    let whiteKeys = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23]
-    // Indices for black keys in two octaves, -1 represents a gap
-    let blackKeys = [1, 3, -1, 6, 8, 10, -1, 13, 15, -1, 18, 20, 22]
+// Represents a single piano key
+struct PianoKey: View {
+    let note: UInt8
+    let label: String
+    var isWhite: Bool = true
+    var action: (UInt8, Bool) -> Void  // Updated to include a Bool to indicate start or stop
     
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            ZStack(alignment: .leading) {
-                HStack(spacing: 0) { // White keys
-                    ForEach(whiteKeys, id: \.self) { key in
-                        Button(action: {
-                            playSound(for: key)
-                        }) {
-                            Rectangle()
-                                .fill(Color.white)
-                                .frame(width: 40, height: 200)
+        ZStack {
+            Rectangle()
+                .fill(isWhite ? Color.white : Color.black)
+            Text(label)
+                .foregroundColor(isWhite ? .black : .white)
+        }
+        .frame(width: isWhite ? 40 : 28, height: isWhite ? 200 : 120)
+        .cornerRadius(isWhite ? 0 : 5)
+        .shadow(radius: isWhite ? 0 : 2)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged({ _ in action(note, true) })  // Start playing note
+                .onEnded({ _ in action(note, false) })  // Stop playing note
+        )
+    }
+}
+
+struct PianoView: View {
+    @State private var scale: [(UInt8, String)] = []
+    @State private var audioEngine = AVAudioEngine()
+    @State private var midiSampler = AVAudioUnitSampler()
+    
+    // Define scales with labels for keys
+    let cMajorScale: [(UInt8, String)] = [
+        (60, "C"), (62, "D"), (64, "E"), (65, "F"), (67, "G"), (69, "A"), (71, "B"),
+        (72, "C"), (74, "D"), (76, "E"), (77, "F"), (79, "G"), (81, "A"), (83, "B")
+    ]
+    let cMinorScale: [(UInt8, String)] = [
+        (60, "C"), (62, "D"), (63, "Eb"), (65, "F"), (67, "G"), (68, "Ab"), (70, "Bb"),
+        (72, "C"), (74, "D"), (75, "Eb"), (77, "F"), (79, "G"), (80, "Ab"), (82, "Bb")
+    ]
+    
+    init() {
+        _scale = State(initialValue: cMajorScale)
+        setupAudioEngine()
+    }
+    
+    var body: some View {
+        VStack {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(scale, id: \.0) { (note, label) in
+                        PianoKey(note: note, label: label, isWhite: true) { note, shouldStart in
+                            if shouldStart {
+                                playMIDINote(note)
+                            } else {
+                                stopMIDINote(note)
+                            }
                         }
-                    }
-                }
-                HStack(spacing: 0) { // Black keys
-                    ForEach(0..<blackKeys.count, id: \.self) { index in
-                        if blackKeys[index] != -1 {
-                            Rectangle()
-                                .fill(Color.black)
-                                .frame(width: 25, height: 120)
-                                .offset(x: CGFloat(index) * 20 + 15, y: 0)
-                                .onTapGesture {
-                                    playSound(for: blackKeys[index])
-                                }
-                        }
+                        .frame(width: 40, height: 200)
                     }
                 }
             }
+            .onAppear {
+                setupAudioEngine()
+            }
+
+            Button("Switch to C Minor") {
+                scale = cMinorScale
+            }
+            .padding()
+
+            Button("Switch to C Major") {
+                scale = cMajorScale
+            }
+            .padding()
         }
-        .frame(height: 200)
-        .background(Color.black)
-        .navigationBarTitle("Piano", displayMode: .inline)
     }
     
-    func playSound(for key: Int) {
-        // Placeholder for playing sound
-        print("Play sound for key: \(key)")
-        // Here, you'd trigger the oscillator or sound playback
+    private func setupAudioEngine() {
+        let _ = try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        let _ = try? AVAudioSession.sharedInstance().setActive(true)
+        
+        audioEngine.attach(midiSampler)
+        audioEngine.connect(midiSampler, to: audioEngine.outputNode, format: nil)
+        
+        do {
+            try audioEngine.start()
+        } catch {
+            print("AudioEngine couldn't start: \(error).")
+        }
     }
+    
+    func playMIDINote(_ note: UInt8) {
+        midiSampler.startNote(note, withVelocity: 64, onChannel: 0)
+    }
+
+    func stopMIDINote(_ note: UInt8) {
+        midiSampler.stopNote(note, onChannel: 0)
+    }
+
 }
