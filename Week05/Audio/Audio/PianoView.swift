@@ -99,12 +99,15 @@ struct PianoView: View {
             }
         }
         
-        func playMIDINote(_ note: UInt8) {
-            midiSampler.startNote(note, withVelocity: 64, onChannel: 0)
-            // Mechanism to stop the note could be implemented here if necessary
-        }
+    func playMIDINote(_ note: UInt8) {
+        print("Starting note: \(note)")
+        midiSampler.startNote(note, withVelocity: 64, onChannel: 0)
+    }
+
     func stopMIDINote(_ note: UInt8) {
+        print("Stopping note: \(note)")
         midiSampler.stopNote(note, onChannel: 0)
     }
+
 
 }
